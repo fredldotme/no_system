@@ -12,12 +12,14 @@ add_library(${PROJECT_NAME}
     SHARED
 
     nosystem.cpp
+    nosystem.h
 )
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     FRAMEWORK TRUE
+    PUBLIC_HEADER "nosystem.h"
     MACOSX_FRAMEWORK_IDENTIFIER me.fredl.nosystem
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
