@@ -13,6 +13,14 @@ __thread FILE* nosystem_stdin;
 __thread FILE* nosystem_stdout;
 __thread FILE* nosystem_stderr;
 
+void nosystem_addcommand(const char* cmd, NoSystemCommand* func) {
+    if (!cmd || !func)
+        return;
+
+    std::string cmd_as_std(cmd);
+    commands.insert({ cmd_as_std, func });
+}
+
 extern int nosystem_isatty(int fd) {
     return 0;
 }
