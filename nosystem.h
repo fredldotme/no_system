@@ -19,7 +19,7 @@ extern int nosystem_kill(void);
 //extern int nosystem_setenv(const char* variableName, const char* value, int overwrite);
 //int nosystem_unsetenv(const char* variableName);
 
-//extern int nosystem_isatty(int fd); // test whether a file descriptor refers to a terminal
+extern int nosystem_isatty(int fd);
 //extern void nosystem_settty(FILE* _tty);
 //extern int nosystem_gettty(void);
 

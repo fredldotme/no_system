@@ -13,6 +13,10 @@ __thread FILE* nosystem_stdin;
 __thread FILE* nosystem_stdout;
 __thread FILE* nosystem_stderr;
 
+extern int nosystem_isatty(int fd) {
+    return 0;
+}
+
 class nosystem_exit_exception : public std::exception {
 public:
     nosystem_exit_exception(int code) : exit_code(code) {}
