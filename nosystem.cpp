@@ -9,7 +9,7 @@
 
 struct RunThreadState {
     std::thread execution_thread;
-    int pid;
+    pid_t pid;
     int exit_code;
 };
 
@@ -21,7 +21,7 @@ public:
 
 static std::map<std::string, NoSystemCommand*> commands;
 static std::map<int, RunThreadState&> command_threads;
-static std::atomic<int> recent_pid{0};
+static std::atomic<pid_t> recent_pid{0};
 
 // Thread-local so that every "process" can have distinct stdio
 __thread FILE* nosystem_stdin;
