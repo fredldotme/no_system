@@ -13,10 +13,14 @@ __thread FILE* nosystem_stdin;
 __thread FILE* nosystem_stdout;
 __thread FILE* nosystem_stderr;
 
-class nosystem_exit_exception : public std::exception {};
+class nosystem_exit_exception : public std::exception {
+public:
+    nosystem_exit_exception(int code) : exit_code(code) {}
+    int exit_code;
+};
 
 void nosystem_exit(int n) {
-    throw nosystem_exit_exception{};
+    throw nosystem_exit_exception(n);
 }
 
 int nosystem_system(const char* cmd) {
@@ -64,8 +68,8 @@ int nosystem_system(const char* cmd) {
     std::thread t = std::thread ([&state, &fit, &args](){
         try {
             state.exit_code = fit->second(args.size(), args.data());
-        } catch (const nosystem_exit_exception&) {
-            state.exit_code = 255;
+        } catch (const nosystem_exit_exception& e) {
+            state.exit_code = e.exit_code;
         }
     });
     t.join();
