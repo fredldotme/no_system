@@ -23,6 +23,11 @@ void nosystem_exit(int n) {
     throw nosystem_exit_exception(n);
 }
 
+int nosystem_kill(void) {
+    nosystem_exit(255);
+    return 0;
+}
+
 int nosystem_system(const char* cmd) {
     if (!cmd)
         return -1;

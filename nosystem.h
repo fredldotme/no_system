@@ -12,6 +12,7 @@ typedef int NoSystemCommand(int argc, char** argv);
 extern void nosystem_addcommand(const char* cmd, NoSystemCommand* func);
 
 extern int nosystem_system(const char* cmd);
+extern void nosystem_exit(int exit_code);
 extern int nosystem_kill(void);
 
 //extern char * nosystem_getenv(const char *name);
