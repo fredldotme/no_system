@@ -7,6 +7,8 @@
 #include <thread>
 #include <vector>
 
+extern "C" {
+
 struct RunThreadState {
     std::thread execution_thread;
     pid_t pid;
@@ -134,4 +136,6 @@ int nosystem_system(const char* cmd) {
     command_threads.erase(command_threads.find(state.pid));
 
     return state.exit_code;
+}
+
 }
