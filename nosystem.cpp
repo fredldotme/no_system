@@ -1,14 +1,29 @@
 #include "nosystem.h"
 
+#include <atomic>
 #include <map>
 #include <stack>
 #include <string>
 #include <thread>
 #include <vector>
 
-static std::map<std::string, NoSystemCommand*> commands;
-static std::stack<std::thread> cmd_threads;
+struct RunThreadState {
+    std::thread execution_thread;
+    int pid;
+    int exit_code;
+};
 
+class nosystem_exit_exception : public std::exception {
+public:
+    nosystem_exit_exception(int code) : exit_code(code) {}
+    int exit_code;
+};
+
+static std::map<std::string, NoSystemCommand*> commands;
+static std::map<int, RunThreadState&> command_threads;
+static std::atomic<int> recent_pid{0};
+
+// Thread-local so that every "process" can have distinct stdio
 __thread FILE* nosystem_stdin;
 __thread FILE* nosystem_stdout;
 __thread FILE* nosystem_stderr;
@@ -21,15 +36,43 @@ void nosystem_addcommand(const char* cmd, NoSystemCommand* func) {
     commands.insert({ cmd_as_std, func });
 }
 
-extern int nosystem_isatty(int fd) {
-    return 0;
+pid_t nosystem_fork() {
+    return ++recent_pid;
 }
 
-class nosystem_exit_exception : public std::exception {
-public:
-    nosystem_exit_exception(int code) : exit_code(code) {}
-    int exit_code;
-};
+pid_t nosystem_currentPid() {
+    for (const auto& t : command_threads) {
+        if (t.second.execution_thread.native_handle() == pthread_self()) {
+            return t.first;
+        }
+    }
+
+    return 1;
+}
+
+pid_t nosystem_waitpid(pid_t pid, int *status, int options)
+{
+    for (const auto& t : command_threads) {
+        if (t.second.pid == pid) {
+            t.second.execution_thread.join();
+            return t.first;
+        }
+    }
+
+    return -1;
+}
+
+int nosystem_executable(const char* cmd) {
+    if (!cmd)
+        return 0;
+
+    std::string cmd_as_std(cmd);
+    return commands.find(cmd_as_std) != commands.end();
+}
+
+int nosystem_isatty(int fd) {
+    return 0;
+}
 
 void nosystem_exit(int n) {
     throw nosystem_exit_exception(n);
@@ -76,20 +119,19 @@ int nosystem_system(const char* cmd) {
         args.push_back(arg.data());
     }
 
-    struct RunThreadState {
-        RunThreadState () {}
-        int exit_code;
-    };
-
     RunThreadState state;
-    std::thread t = std::thread ([&state, &fit, &args](){
+    state.pid = nosystem_fork();
+    state.execution_thread = std::thread ([&state, &fit, &args](){
         try {
             state.exit_code = fit->second(args.size(), args.data());
         } catch (const nosystem_exit_exception& e) {
             state.exit_code = e.exit_code;
         }
     });
-    t.join();
+
+    command_threads.insert({state.pid, state});
+    state.execution_thread.join();
+    command_threads.erase(command_threads.find(state.pid));
 
     return state.exit_code;
 }
