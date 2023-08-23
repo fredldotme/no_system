@@ -64,5 +64,5 @@ xcuserdata/
 .DS_Store
 
 # Qt
-build/
+build*/
 *.txt.user
