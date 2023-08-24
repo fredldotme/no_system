@@ -95,8 +95,7 @@ int nosystem_system(const char* cmd) {
     std::string cmd_as_std(cmd);
     for (auto it = cmd_as_std.begin(); it != cmd_as_std.end(); it++) {
         if (*it == '\"') {
-            ++it;
-            while (*it != '\"') {
+            while (++it != cmd_as_std.end() && *it != '\"') {
                 tmp_part += *it;
             }
         } else if (*it == ' ') {
