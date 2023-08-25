@@ -12,6 +12,9 @@ extern "C" {
 struct RunThreadState {
     std::thread execution_thread;
     pid_t pid;
+    FILE* stdin;
+    FILE* stdout;
+    FILE* stderr;
     int exit_code;
 };
 
@@ -122,8 +125,15 @@ int nosystem_system(const char* cmd) {
 
     RunThreadState state;
     state.pid = nosystem_fork();
+    state.stdin = nosystem_stdin;
+    state.stdout = nosystem_stdout;
+    state.stderr = nosystem_stderr;
+
     state.execution_thread = std::thread ([&state, &fit, &args](){
         try {
+            nosystem_stdin = state.stdin;
+            nosystem_stdout = state.stdout;
+            nosystem_stderr = state.stderr;
             state.exit_code = fit->second(args.size(), args.data());
         } catch (const nosystem_exit_exception& e) {
             state.exit_code = e.exit_code;
