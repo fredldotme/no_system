@@ -72,7 +72,7 @@ int nosystem_executable(const char* cmd) {
         return 0;
 
     std::string cmd_as_std(cmd);
-    return commands.find(cmd_as_std) != commands.end();
+    return (commands.find(cmd_as_std) != commands.end()) ? 1 : 0;
 }
 
 int nosystem_isatty(int fd) {
@@ -81,11 +81,6 @@ int nosystem_isatty(int fd) {
 
 void nosystem_exit(int n) {
     throw nosystem_exit_exception(n);
-}
-
-int nosystem_kill(void) {
-    nosystem_exit(255);
-    return 0;
 }
 
 int nosystem_system(const char* cmd) {

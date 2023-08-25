@@ -18,7 +18,6 @@ extern void nosystem_addcommand(const char* cmd, NoSystemCommand* func);
 
 extern int nosystem_system(const char* cmd);
 extern void nosystem_exit(int exit_code);
-extern int nosystem_kill(void);
 extern int nosystem_executable(const char* cmd);
 
 extern pid_t nosystem_fork();
