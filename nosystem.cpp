@@ -125,6 +125,23 @@ void nosystem_exit(int n) {
     throw nosystem_exit_exception(n);
 }
 
+
+int nosystem_execv(const char *pathname, char *const argv[]) {
+    return nosystem_execve(pathname, argv, nullptr);
+}
+
+int nosystem_execve(const char *pathname, char *const argv[], char *const envp[]) {
+    std::string pathname_as_std(pathname);
+    auto fit = commands.find(pathname_as_std);
+    if (fit == commands.end())
+        return -1;
+
+    int argc = 0;
+    while (argv[argc++] != nullptr);
+
+    return fit->second(argc, (char**)argv);
+}
+
 int nosystem_system(const char* cmd) {
     if (!cmd)
         return -1;
