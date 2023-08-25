@@ -67,26 +67,8 @@ pid_t nosystem_waitpid(pid_t pid, int *status, int options)
     return -1;
 }
 
-int nosystem_executable(const char* cmd) {
-    if (!cmd)
-        return 0;
-
-    std::string cmd_as_std(cmd);
-    return (commands.find(cmd_as_std) != commands.end()) ? 1 : 0;
-}
-
-int nosystem_isatty(int fd) {
-    return 0;
-}
-
-void nosystem_exit(int n) {
-    throw nosystem_exit_exception(n);
-}
-
-int nosystem_system(const char* cmd) {
-    if (!cmd)
-        return -1;
-
+static inline std::vector<std::string> __nosystem_split_command(const std::string& cmd)
+{
     std::vector<std::string> cmd_parts;
     std::string tmp_part;
 
@@ -106,6 +88,42 @@ int nosystem_system(const char* cmd) {
     if (tmp_part.size() != 0)
         cmd_parts.push_back(tmp_part);
 
+    return cmd_parts;
+}
+
+int nosystem_executable(const char* cmd) {
+    if (!cmd)
+        return 0;
+
+    std::string cmd_as_std(cmd);
+    const std::vector<std::string> cmd_parts = __nosystem_split_command(cmd_as_std);
+
+    if (cmd_parts.size() == 0)
+        return 0;
+
+    for (const auto& command : commands) {
+        if (cmd_parts[0].find(command.first) != std::string::npos) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int nosystem_isatty(int fd) {
+    return 0;
+}
+
+void nosystem_exit(int n) {
+    throw nosystem_exit_exception(n);
+}
+
+int nosystem_system(const char* cmd) {
+    if (!cmd)
+        return -1;
+
+    std::string cmd_as_std(cmd);
+    const std::vector<std::string> cmd_parts = __nosystem_split_command(cmd_as_std);
+
     if (cmd_parts.size() == 0)
         return -1;
 
@@ -113,8 +131,8 @@ int nosystem_system(const char* cmd) {
     if (fit == commands.end())
         return -1;
 
-    std::vector<char*> args;
-    for (auto& arg : cmd_parts) {
+    std::vector<const char*> args;
+    for (const auto& arg : cmd_parts) {
         args.push_back(arg.data());
     }
 
@@ -129,7 +147,7 @@ int nosystem_system(const char* cmd) {
             nosystem_stdin = state.stdin;
             nosystem_stdout = state.stdout;
             nosystem_stderr = state.stderr;
-            state.exit_code = fit->second(args.size(), args.data());
+            state.exit_code = fit->second(args.size(), (char**)args.data());
         } catch (const nosystem_exit_exception& e) {
             state.exit_code = e.exit_code;
         }
