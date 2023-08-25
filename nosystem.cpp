@@ -1,11 +1,14 @@
 #include "nosystem.h"
 
 #include <atomic>
+#include <iostream>
 #include <map>
 #include <stack>
 #include <string>
 #include <thread>
 #include <vector>
+
+#include <unistd.h>
 
 extern "C" {
 
@@ -96,6 +99,11 @@ int nosystem_executable(const char* cmd) {
         return 0;
 
     std::string cmd_as_std(cmd);
+
+    if (getenv("NOSYSTEM_DEBUG")) {
+        std::cout << "Command to be found: " << cmd_as_std << std::endl;
+    }
+
     const std::vector<std::string> cmd_parts = __nosystem_split_command(cmd_as_std);
 
     if (cmd_parts.size() == 0)
@@ -122,6 +130,11 @@ int nosystem_system(const char* cmd) {
         return -1;
 
     std::string cmd_as_std(cmd);
+
+    if (getenv("NOSYSTEM_DEBUG")) {
+        std::cout << "Command to be found: " << cmd_as_std << std::endl;
+    }
+
     const std::vector<std::string> cmd_parts = __nosystem_split_command(cmd_as_std);
 
     if (cmd_parts.size() == 0)
