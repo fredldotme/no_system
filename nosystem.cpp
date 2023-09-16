@@ -171,6 +171,7 @@ int nosystem_system(const char* cmd) {
     state.stdin = nosystem_stdin;
     state.stdout = nosystem_stdout;
     state.stderr = nosystem_stderr;
+    state.exit_code = 0;
 
     state.execution_thread = std::thread ([&state, &fit, &args](){
         try {
