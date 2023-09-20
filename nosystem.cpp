@@ -82,7 +82,8 @@ static inline std::vector<std::string> __nosystem_split_command(const std::strin
                 tmp_part += *it;
             }
         } else if (*it == ' ') {
-            cmd_parts.push_back(tmp_part);
+            if (tmp_part.size() != 0)
+                cmd_parts.push_back(tmp_part);
             tmp_part = "";
         } else {
             tmp_part += *it;
