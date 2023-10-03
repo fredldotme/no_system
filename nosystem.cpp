@@ -131,6 +131,10 @@ int nosystem_execv(const char *pathname, char *const argv[]) {
     return nosystem_execve(pathname, argv, nullptr);
 }
 
+int nosystem_execvp(const char *pathname, char *const argv[]) {
+    return nosystem_execve(pathname, argv, nullptr);
+}
+
 int nosystem_execve(const char *pathname, char *const argv[], char *const envp[]) {
     std::string pathname_as_std(pathname);
     auto fit = commands.find(pathname_as_std);
