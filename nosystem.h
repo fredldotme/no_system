@@ -14,7 +14,7 @@ extern __thread FILE* nosystem_stderr;
 
 typedef int NoSystemCommand(int argc, char** argv);
 
-extern bool nosystem_init(void);
+extern int nosystem_init(void);
 extern void nosystem_addcommand(const char* cmd, NoSystemCommand* func);
 
 extern int nosystem_system(const char* cmd);

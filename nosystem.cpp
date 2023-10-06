@@ -51,7 +51,7 @@ __thread FILE* nosystem_stdin;
 __thread FILE* nosystem_stdout;
 __thread FILE* nosystem_stderr;
 
-bool nosystem_init()
+int nosystem_init()
 {
     std::string currExe;
     char buf[PATH_MAX];
@@ -60,7 +60,7 @@ bool nosystem_init()
         currExe = std::string(buf);
 
     if (currExe.empty())
-        return;
+        return 0;
 
     std::string currPath = "/";
     std::string delimiter = "/";
@@ -91,6 +91,8 @@ bool nosystem_init()
         d.library = fwPath + fw + ".framework/" + fw;
         dycommands.insert({ commandName, d });
     }
+
+    return 1;
 }
 
 static ResolvedDynCommand nosystem_resolvemain(const DynCommand& lib) {
