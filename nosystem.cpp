@@ -85,9 +85,10 @@ int nosystem_init()
     YAML::Node commandsNode = rootNode["commands"];
     for (int i = 0; i < commandsNode.size(); i++) {
         DynCommand d;
-        const auto commandName = commandsNode["command"].as<std::string>();
-        const auto fw = commandsNode["framework"].as<std::string>();
-        d.entrypoint = commandsNode["entrypoint"].as<std::string>();
+        const auto currentNode = commandsNode[i];
+        const auto commandName = currentNode["command"].as<std::string>();
+        const auto fw = currentNode["framework"].as<std::string>();
+        d.entrypoint = currentNode["entrypoint"].as<std::string>();
         d.library = fwPath + fw + ".framework/" + fw;
         dycommands.insert({ commandName, d });
     }
