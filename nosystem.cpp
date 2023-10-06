@@ -186,6 +186,12 @@ int nosystem_executable(const char* cmd) {
             return 1;
         }
     }
+
+    for (const auto& dycommand : dycommands) {
+        if (cmd_parts[0].find(dycommand.first) != std::string::npos) {
+            return 1;
+        }
+    }
     return 0;
 }
 
@@ -208,14 +214,32 @@ int nosystem_execvp(const char *pathname, char *const argv[]) {
 
 int nosystem_execve(const char *pathname, char *const argv[], char *const envp[]) {
     std::string pathname_as_std(pathname);
+    ResolvedDynCommand resolved { nullptr, nullptr };
+    NoSystemCommand* command = nullptr;
+
+    // Find built-ins first
     auto fit = commands.find(pathname_as_std);
-    if (fit == commands.end())
+    if (fit != commands.end()) {
+        command = fit->second;
+    }
+
+    // Check external commands afterwards
+    if (!command) {
+        auto dfit = dycommands.find(pathname_as_std);
+        if (dfit != dycommands.end()) {
+            resolved = nosystem_resolvemain(dfit->second);
+            command = resolved.entrypoint;
+        }
+    }
+
+    if (!command) {
         return -1;
+    }
 
     int argc = 0;
     while (argv[argc++] != nullptr);
 
-    return fit->second(argc, (char**)argv);
+    return command(argc, (char**)argv);
 }
 
 int nosystem_system(const char* cmd) {
