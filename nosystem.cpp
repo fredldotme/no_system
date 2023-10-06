@@ -9,6 +9,9 @@
 #include <vector>
 
 #include <unistd.h>
+#include <dlfcn.h>
+#include <mach-o/dyld.h>
+#include <yaml-cpp/yaml.h>
 
 extern "C" {
 
@@ -27,7 +30,19 @@ public:
     int exit_code;
 };
 
+struct DynCommand {
+    std::string library;
+    std::string entrypoint;
+};
+
+struct ResolvedDynCommand {
+    NoSystemCommand* entrypoint;
+    void* handle;
+};
+
 static std::map<std::string, NoSystemCommand*> commands;
+static std::map<std::string, DynCommand> dycommands;
+
 static std::map<int, RunThreadState&> command_threads;
 static std::atomic<pid_t> recent_pid{0};
 
@@ -35,6 +50,59 @@ static std::atomic<pid_t> recent_pid{0};
 __thread FILE* nosystem_stdin;
 __thread FILE* nosystem_stdout;
 __thread FILE* nosystem_stderr;
+
+bool nosystem_init()
+{
+    std::string currExe;
+    char buf[PATH_MAX];
+    uint32_t bufsize = PATH_MAX;
+    if(!_NSGetExecutablePath(buf, &bufsize))
+        currExe = std::string(buf);
+
+    if (currExe.empty())
+        return;
+
+    std::string currPath = "/";
+    std::string delimiter = "/";
+    std::string s = currExe;
+
+    size_t pos = 0;
+    std::string token;
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token = s.substr(0, pos);
+        currPath += (token + "/");
+        s.erase(0, pos + delimiter.length());
+    }
+
+    const auto yamlPath = currPath + "commands.yaml";
+    const auto fwPath = currPath + "Frameworks/";
+
+    if (getenv("NOSYSTEM_DEBUG")) {
+        std::cout << "Loading commands from: " << yamlPath;
+    }
+
+    YAML::Node rootNode = YAML::LoadFile(yamlPath);
+    YAML::Node commandsNode = rootNode["commands"];
+    for (int i = 0; i < commandsNode.size(); i++) {
+        DynCommand d;
+        const auto commandName = commandsNode["command"].as<std::string>();
+        const auto fw = commandsNode["framework"].as<std::string>();
+        d.entrypoint = commandsNode["entrypoint"].as<std::string>();
+        d.library = fwPath + fw + ".framework/" + fw;
+        dycommands.insert({ commandName, d });
+    }
+}
+
+static ResolvedDynCommand nosystem_resolvemain(const DynCommand& lib) {
+    ResolvedDynCommand ret { nullptr, nullptr };
+    auto handle = dlopen(lib.library.c_str(), RTLD_LAZY);
+    if (!handle)
+        return ret;
+
+    *(void**)(&ret.entrypoint) = dlsym(handle, lib.entrypoint.c_str());
+    ret.handle = handle;
+    return ret;
+}
 
 void nosystem_addcommand(const char* cmd, NoSystemCommand* func) {
     if (!cmd || !func)
@@ -162,8 +230,25 @@ int nosystem_system(const char* cmd) {
     if (cmd_parts.size() == 0)
         return -1;
 
+    ResolvedDynCommand resolved { nullptr, nullptr };
+    NoSystemCommand* command = nullptr;
+
+    // Find built-ins first
     auto fit = commands.find(cmd_parts[0]);
-    if (fit == commands.end())
+    if (fit != commands.end()) {
+        command = fit->second;
+    }
+
+    // Check external commands afterwards
+    if (!command) {
+        auto dfit = dycommands.find(cmd_parts[0]);
+        if (dfit != dycommands.end()) {
+            resolved = nosystem_resolvemain(dfit->second);
+            command = resolved.entrypoint;
+        }
+    }
+
+    if (!command)
         return -1;
 
     std::vector<const char*> args;
@@ -178,12 +263,12 @@ int nosystem_system(const char* cmd) {
     state.stderr = nosystem_stderr;
     state.exit_code = 0;
 
-    state.execution_thread = std::thread ([&state, &fit, &args](){
+    state.execution_thread = std::thread ([&state, &command, &args](){
         try {
             nosystem_stdin = state.stdin;
             nosystem_stdout = state.stdout;
             nosystem_stderr = state.stderr;
-            state.exit_code = fit->second(args.size(), (char**)args.data());
+            state.exit_code = command(args.size(), (char**)args.data());
         } catch (const nosystem_exit_exception& e) {
             state.exit_code = e.exit_code;
         }
@@ -192,6 +277,10 @@ int nosystem_system(const char* cmd) {
     command_threads.insert({state.pid, state});
     state.execution_thread.join();
     command_threads.erase(command_threads.find(state.pid));
+
+    if (resolved.handle) {
+        dlclose(resolved.handle);
+    }
 
     return state.exit_code;
 }

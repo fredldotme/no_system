@@ -5,6 +5,12 @@ set(PROJECT_NAME nosystem)
 project(${PROJECT_NAME} VERSION 0.1 LANGUAGES CXX)
 project(${PROJECT_NAME} VERSION 0.1 LANGUAGES C)
 
+set(YAML_BUILD_SHARED_LIBS OFF)
+set(YAML_CPP_BUILD_TOOLS OFF)
+
+add_subdirectory(3rdparty/yaml-cpp)
+include_directories(3rdpart/yaml-cpp/include)
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-cxa-atexit")
 
@@ -13,6 +19,10 @@ add_library(${PROJECT_NAME}
 
     nosystem.cpp
     nosystem.h
+)
+
+target_link_libraries(${PROJECT_NAME}
+    yaml-cpp
 )
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
