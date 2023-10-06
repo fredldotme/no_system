@@ -90,6 +90,8 @@ int nosystem_init()
         const auto fw = currentNode["framework"].as<std::string>();
         d.entrypoint = currentNode["entrypoint"].as<std::string>();
         d.library = fwPath + fw + ".framework/" + fw;
+
+        std::cout << "Adding command " << commandName << " from library " << d.library << " (entrypoint '" << d.entrypoint << "')" << std::endl;
         dycommands.insert({ commandName, d });
     }
 
