@@ -9,18 +9,21 @@
 #include <vector>
 
 #include <unistd.h>
+
+#ifndef __wasi__
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
 #include <yaml-cpp/yaml.h>
+#endif
 
 extern "C" {
 
 struct RunThreadState {
     std::thread execution_thread;
     pid_t pid;
-    FILE* stdin;
-    FILE* stdout;
-    FILE* stderr;
+    FILE* my_stdin;
+    FILE* my_stdout;
+    FILE* my_stderr;
     int exit_code;
 };
 
@@ -53,6 +56,7 @@ __thread FILE* nosystem_stderr;
 
 int nosystem_init()
 {
+#ifndef __wasi__
     std::string currExe;
     char buf[PATH_MAX];
     uint32_t bufsize = PATH_MAX;
@@ -94,18 +98,22 @@ int nosystem_init()
         std::cout << "Adding command " << commandName << " from library " << d.library << " (entrypoint '" << d.entrypoint << "')" << std::endl;
         dycommands.insert({ commandName, d });
     }
+#endif
 
     return 1;
 }
 
 static ResolvedDynCommand nosystem_resolvemain(const DynCommand& lib) {
     ResolvedDynCommand ret { nullptr, nullptr };
+
+#ifndef __wasi__
     auto handle = dlopen(lib.library.c_str(), RTLD_LAZY);
     if (!handle)
         return ret;
 
     *(void**)(&ret.entrypoint) = dlsym(handle, lib.entrypoint.c_str());
     ret.handle = handle;
+#endif
     return ret;
 }
 
@@ -202,7 +210,9 @@ int nosystem_isatty(int fd) {
 }
 
 void nosystem_exit(int n) {
+#ifndef __wasi__
     throw nosystem_exit_exception(n);
+#endif
 }
 
 
@@ -287,29 +297,35 @@ int nosystem_system(const char* cmd) {
 
     RunThreadState state;
     state.pid = nosystem_fork();
-    state.stdin = nosystem_stdin;
-    state.stdout = nosystem_stdout;
-    state.stderr = nosystem_stderr;
+    state.my_stdin = nosystem_stdin;
+    state.my_stdout = nosystem_stdout;
+    state.my_stderr = nosystem_stderr;
     state.exit_code = 0;
 
     state.execution_thread = std::thread ([&state, &command, &args](){
+#ifndef __wasi__
         try {
-            nosystem_stdin = state.stdin;
-            nosystem_stdout = state.stdout;
-            nosystem_stderr = state.stderr;
+#endif
+            nosystem_stdin = state.my_stdin;
+            nosystem_stdout = state.my_stdout;
+            nosystem_stderr = state.my_stderr;
             state.exit_code = command(args.size(), (char**)args.data());
+#ifndef __wasi__
         } catch (const nosystem_exit_exception& e) {
             state.exit_code = e.exit_code;
         }
+#endif
     });
 
     command_threads.insert({state.pid, state});
     state.execution_thread.join();
     command_threads.erase(command_threads.find(state.pid));
 
+#ifndef __wasi__
     if (resolved.handle) {
         dlclose(resolved.handle);
     }
+#endif
 
     return state.exit_code;
 }
