@@ -252,11 +252,15 @@ int nosystem_execve(const char *pathname, char *const argv[], char *const envp[]
     while (argv[argc++] != nullptr);
 
     int ret = 0;
+#ifndef __wasi__
     try {
+#endif
         ret = command(argc, (char**)argv);
+#ifndef __wasi__
     } catch (const nosystem_exit_exception& e) {
         ret = e.exit_code;
     }
+#endif
     return ret;
 }
 
