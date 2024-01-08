@@ -251,7 +251,13 @@ int nosystem_execve(const char *pathname, char *const argv[], char *const envp[]
     int argc = 0;
     while (argv[argc++] != nullptr);
 
-    return command(argc, (char**)argv);
+    int ret = 0;
+    try {
+        ret = command(argc, (char**)argv);
+    } catch (const nosystem_exit_exception& e) {
+        ret = e.exit_code;
+    }
+    return ret;
 }
 
 int nosystem_system(const char* cmd) {
