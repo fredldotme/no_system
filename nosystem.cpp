@@ -148,7 +148,7 @@ pid_t nosystem_waitpid(pid_t pid, int *status, int options)
         }
     }
 
-    return -1;
+    return 0;
 }
 
 static inline std::vector<std::string> __nosystem_split_command(const std::string& cmd)
