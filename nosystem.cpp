@@ -225,29 +225,6 @@ int nosystem_execvp(const char *pathname, char *const argv[]) {
 }
 
 int nosystem_execve(const char *pathname, char *const argv[], char *const envp[]) {
-    std::string pathname_as_std(pathname);
-    ResolvedDynCommand resolved { nullptr, nullptr };
-    NoSystemCommand* command = nullptr;
-
-    // Find built-ins first
-    auto fit = commands.find(pathname_as_std);
-    if (fit != commands.end()) {
-        command = fit->second;
-    }
-
-    // Check external commands afterwards
-    if (!command) {
-        auto dfit = dycommands.find(pathname_as_std);
-        if (dfit != dycommands.end()) {
-            resolved = nosystem_resolvemain(dfit->second);
-            command = resolved.entrypoint;
-        }
-    }
-
-    if (!command) {
-        return -1;
-    }
-
     int argc = 0;
     while (argv[argc++] != nullptr);
 
@@ -258,30 +235,55 @@ int nosystem_execve(const char *pathname, char *const argv[], char *const envp[]
     state.my_stderr = nosystem_stderr;
     state.exit_code = 0;
 
-    state.execution_thread = std::thread ([&state, &command, &argc, &argv](){
+    state.execution_thread = std::thread ([pathname, &state, &argc, &argv](){
 #ifndef __wasi__
+        ResolvedDynCommand resolved { nullptr, nullptr };
         try {
 #endif
+            std::string pathname_as_std(pathname);
+
+            NoSystemCommand* command = nullptr;
+
+            // Find built-ins first
+            auto fit = commands.find(pathname_as_std);
+            if (fit != commands.end()) {
+                command = fit->second;
+            }
+
+            // Check external commands afterwards
+            if (!command) {
+                auto dfit = dycommands.find(pathname_as_std);
+                if (dfit != dycommands.end()) {
+                    resolved = nosystem_resolvemain(dfit->second);
+                    command = resolved.entrypoint;
+                }
+            }
+
+            if (!command) {
+                nosystem_exit(-1);
+                return;
+            }
+
             nosystem_stdin = state.my_stdin;
             nosystem_stdout = state.my_stdout;
             nosystem_stderr = state.my_stderr;
             state.exit_code = command(argc, (char**)argv);
 #ifndef __wasi__
+            if (resolved.handle) {
+                dlclose(resolved.handle);
+            }
         } catch (const nosystem_exit_exception& e) {
             state.exit_code = e.exit_code;
-        }
+            if (resolved.handle) {
+                dlclose(resolved.handle);
+            }
 #endif
+        }
     });
 
     command_threads.insert({state.pid, state});
     state.execution_thread.join();
     command_threads.erase(command_threads.find(state.pid));
-
-#ifndef __wasi__
-    if (resolved.handle) {
-        dlclose(resolved.handle);
-    }
-#endif
 
     return state.exit_code;
 }
@@ -290,43 +292,6 @@ int nosystem_system(const char* cmd) {
     if (!cmd)
         return -1;
 
-    std::string cmd_as_std(cmd);
-
-    if (getenv("NOSYSTEM_DEBUG")) {
-        std::cout << "Command to be found: " << cmd_as_std << std::endl;
-    }
-
-    const std::vector<std::string> cmd_parts = __nosystem_split_command(cmd_as_std);
-
-    if (cmd_parts.size() == 0)
-        return -1;
-
-    ResolvedDynCommand resolved { nullptr, nullptr };
-    NoSystemCommand* command = nullptr;
-
-    // Find built-ins first
-    auto fit = commands.find(cmd_parts[0]);
-    if (fit != commands.end()) {
-        command = fit->second;
-    }
-
-    // Check external commands afterwards
-    if (!command) {
-        auto dfit = dycommands.find(cmd_parts[0]);
-        if (dfit != dycommands.end()) {
-            resolved = nosystem_resolvemain(dfit->second);
-            command = resolved.entrypoint;
-        }
-    }
-
-    if (!command)
-        return -1;
-
-    std::vector<const char*> args;
-    for (const auto& arg : cmd_parts) {
-        args.push_back(arg.data());
-    }
-
     RunThreadState state;
     state.pid = nosystem_fork();
     state.my_stdin = nosystem_stdin;
@@ -334,30 +299,67 @@ int nosystem_system(const char* cmd) {
     state.my_stderr = nosystem_stderr;
     state.exit_code = 0;
 
-    state.execution_thread = std::thread ([&state, &command, &args](){
+    state.execution_thread = std::thread ([&state, &cmd](){
 #ifndef __wasi__
+        ResolvedDynCommand resolved { nullptr, nullptr };
         try {
 #endif
+            NoSystemCommand* command = nullptr;
+
+            std::string cmd_as_std(cmd);
+
+            if (getenv("NOSYSTEM_DEBUG")) {
+                std::cout << "Command to be found: " << cmd_as_std << std::endl;
+            }
+
+            const std::vector<std::string> cmd_parts = __nosystem_split_command(cmd_as_std);
+            if (cmd_parts.size() == 0)
+                return -1;
+
+            std::vector<const char*> args;
+            for (const auto& arg : cmd_parts) {
+                args.push_back(arg.data());
+            }
+
+            // Find built-ins first
+            auto fit = commands.find(cmd_parts[0]);
+            if (fit != commands.end()) {
+                command = fit->second;
+            }
+
+            // Check external commands afterwards
+            if (!command) {
+                auto dfit = dycommands.find(cmd_parts[0]);
+                if (dfit != dycommands.end()) {
+                    resolved = nosystem_resolvemain(dfit->second);
+                    command = resolved.entrypoint;
+                }
+            }
+
+            if (!command)
+                nosystem_exit(-1);
+
             nosystem_stdin = state.my_stdin;
             nosystem_stdout = state.my_stdout;
             nosystem_stderr = state.my_stderr;
             state.exit_code = command(args.size(), (char**)args.data());
+
 #ifndef __wasi__
+            if (resolved.handle) {
+                dlclose(resolved.handle);
+            }
         } catch (const nosystem_exit_exception& e) {
             state.exit_code = e.exit_code;
-        }
+            if (resolved.handle) {
+                dlclose(resolved.handle);
+            }
 #endif
+        }
     });
 
     command_threads.insert({state.pid, state});
     state.execution_thread.join();
     command_threads.erase(command_threads.find(state.pid));
-
-#ifndef __wasi__
-    if (resolved.handle) {
-        dlclose(resolved.handle);
-    }
-#endif
 
     return state.exit_code;
 }
