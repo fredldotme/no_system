@@ -107,7 +107,7 @@ static ResolvedDynCommand nosystem_resolvemain(const DynCommand& lib) {
     ResolvedDynCommand ret { nullptr, nullptr };
 
 #ifndef __wasi__
-    auto handle = dlopen(lib.library.c_str(), RTLD_LAZY);
+    auto handle = dlopen(lib.library.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (!handle)
         return ret;
 
