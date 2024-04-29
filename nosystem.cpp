@@ -251,17 +251,39 @@ int nosystem_execve(const char *pathname, char *const argv[], char *const envp[]
     int argc = 0;
     while (argv[argc++] != nullptr);
 
-    int ret = 0;
+    RunThreadState state;
+    state.pid = nosystem_fork();
+    state.my_stdin = nosystem_stdin;
+    state.my_stdout = nosystem_stdout;
+    state.my_stderr = nosystem_stderr;
+    state.exit_code = 0;
+
+    state.execution_thread = std::thread ([&state, &command, &argc, &argv](){
 #ifndef __wasi__
-    try {
+        try {
 #endif
-        ret = command(argc, (char**)argv);
+            nosystem_stdin = state.my_stdin;
+            nosystem_stdout = state.my_stdout;
+            nosystem_stderr = state.my_stderr;
+            state.exit_code = command(argc, (char**)argv);
 #ifndef __wasi__
-    } catch (const nosystem_exit_exception& e) {
-        ret = e.exit_code;
+        } catch (const nosystem_exit_exception& e) {
+            state.exit_code = e.exit_code;
+        }
+#endif
+    });
+
+    command_threads.insert({state.pid, state});
+    state.execution_thread.join();
+    command_threads.erase(command_threads.find(state.pid));
+
+#ifndef __wasi__
+    if (resolved.handle) {
+        dlclose(resolved.handle);
     }
 #endif
-    return ret;
+
+    return state.exit_code;
 }
 
 int nosystem_system(const char* cmd) {
